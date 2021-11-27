@@ -19,29 +19,40 @@ define("PHC_ECHO", auto());
 define("PHC_STRING", auto());
 define("PHC_INTEGER", auto());
 
-$program = [
-    [
-        [PHC_STRING, "foo"]
-    ],
-    [
-        [PHC_ECHO]
-    ],
-    [
-        [PHC_ECHO],
-        [PHC_STRING, "bar"]
-    ],
-    [
-        [PHC_ECHO],
-        [PHC_INTEGER, 10]
-    ]
+$tokens = [
+    ["[0-9]+", PHC_INTEGER],
+    ["echo|print", PHC_ECHO],
+    ["(\"|')([^\"']+)(\"|')", PHC_STRING]
 ];
+
+function lex_file($name)
+{
+    $content = file_get_contents($name);
+    $program = explode(";", $content);
+
+    return $program;
+}
 
 function lex($statements)
 {
+    global $tokens;
+    $tokenized_statements = [];
     foreach ($statements as $statement)
     {
-       // literally todo lol. Strings are bloat, TOKENS SUPERMACY 
+        $tokenized = "[$statement";
+        foreach ($tokens as [$expresion, $token])
+        {
+            $tokenized = preg_replace_callback("/$expresion/", function($matches) use($token) {
+                if ($token == 2)
+                    return "[{$token}, \"{$matches[2]}\"],";
+                if ($token == 3)
+                    return "[{$token}, {$matches[0]}],";
+                return "[{$token}],";
+            }, $tokenized);
+        }
+        array_push($tokenized_statements, json_decode(substr_replace($tokenized, "]", -1))); 
     }
+    return $tokenized_statements;
 }
 
 function parse($statements)
@@ -72,6 +83,7 @@ function parse($statements)
     }
 }
 
+$program = lex(lex_file($argv[1]));
 parse($program);
 $output = join("\n", $includes);
 $output .= "\n\nint main()\n{\n";
